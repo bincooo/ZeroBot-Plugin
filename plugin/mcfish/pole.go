@@ -13,8 +13,11 @@ import (
 )
 
 func init() {
-	engine.OnRegex(`^装备(`+strings.Join(poleList, "|")+`)$`, getdb).SetBlock(true).Limit(ctxext.LimitByUser).Handle(func(ctx *zero.Ctx) {
+	engine.OnRegex(`^装备(`+strings.Join(poleList, "|")+`)$`, getdb).SetBlock(true).Limit(CustomLimitByUser).Handle(func(ctx *zero.Ctx) {
 		uid := ctx.Event.UserID
+		sMu.SLock(uid)
+		defer sMu.SUnlock(uid)
+
 		equipInfo, err := dbdata.getUserEquip(uid)
 		if err != nil {
 			ctx.SendChain(message.Text("[ERROR at pole.go.1]:", err))
@@ -152,6 +155,9 @@ func init() {
 	})
 	engine.OnFullMatchGroup([]string{"修复鱼竿", "维修鱼竿"}, getdb).SetBlock(true).Limit(ctxext.LimitByUser).Handle(func(ctx *zero.Ctx) {
 		uid := ctx.Event.UserID
+		sMu.SLock(uid)
+		defer sMu.SUnlock(uid)
+
 		equipInfo, err := dbdata.getUserEquip(uid)
 		if err != nil {
 			ctx.SendChain(message.Text("[ERROR at pole.go.5]:", err))
@@ -251,14 +257,14 @@ func init() {
 			equipInfo.Durable = durationList[equipInfo.Equip]
 		}
 		msg := ""
-		if newEquipInfo.Induce != 0 && rand.Intn(100) < 50 {
+		if newEquipInfo.Induce != 0 && rand.Intn(100) < ADD_BUFF_1 {
 			equipInfo.Induce += newEquipInfo.Induce
 			if equipInfo.Induce > 3 {
 				equipInfo.Induce = 3
 			}
 			msg += ",诱钓等级提升至" + enchantLevel[equipInfo.Induce]
 		}
-		if newEquipInfo.Favor != 0 && rand.Intn(100) < 50 {
+		if newEquipInfo.Favor != 0 && rand.Intn(100) < ADD_BUFF_2 {
 			equipInfo.Favor += newEquipInfo.Favor
 			if equipInfo.Favor > 3 {
 				equipInfo.Favor = 3
@@ -282,8 +288,11 @@ func init() {
 			),
 		)
 	})
-	engine.OnRegex(`^附魔(诱钓|海之眷顾)$`, getdb).SetBlock(true).Limit(ctxext.LimitByUser).Handle(func(ctx *zero.Ctx) {
+	engine.OnRegex(`^附魔(诱钓|海之眷顾)$`, getdb).SetBlock(true).Limit(CustomLimitByUser).Handle(func(ctx *zero.Ctx) {
 		uid := ctx.Event.UserID
+		sMu.SLock(uid)
+		defer sMu.SUnlock(uid)
+
 		equipInfo, err := dbdata.getUserEquip(uid)
 		if err != nil {
 			ctx.SendChain(message.Text("[ERROR at pole.go.7]:", err))
@@ -308,18 +317,22 @@ func init() {
 		err = dbdata.updateUserThingInfo(uid, bookInfo)
 		number := 0
 		if err == nil {
-			if rand.Intn(100) > 50 {
-				ctx.SendChain(message.Text("附魔失败了"))
-				return
-			}
 			switch book {
 			case "诱钓":
+				if rand.Intn(100) > ADD_BUFF_1 {
+					ctx.SendChain(message.Text("附魔失败了"))
+					return
+				}
 				equipInfo.Induce++
 				if equipInfo.Induce > 3 {
 					equipInfo.Induce = 3
 				}
 				number = equipInfo.Induce
 			case "海之眷顾":
+				if rand.Intn(100) > ADD_BUFF_2 {
+					ctx.SendChain(message.Text("附魔失败了"))
+					return
+				}
 				equipInfo.Favor++
 				if equipInfo.Favor > 3 {
 					equipInfo.Favor = 3
@@ -337,7 +350,7 @@ func init() {
 		}
 		ctx.SendChain(message.Text("附魔成功,", book, "等级提高至", enchantLevel[number]))
 	})
-	engine.OnRegex(`^合成(.+竿|三叉戟)$`, getdb).SetBlock(true).Limit(ctxext.LimitByUser).Handle(func(ctx *zero.Ctx) {
+	engine.OnRegex(`^合成(.+竿|三叉戟)$`, getdb).SetBlock(true).Limit(CustomLimitByUser).Handle(func(ctx *zero.Ctx) {
 		uid := ctx.Event.UserID
 		thingList := []string{"木竿", "铁竿", "金竿", "钻石竿", "下界合金竿", "三叉戟"}
 		thingName := ctx.State["regex_matched"].([]string)[1]
@@ -455,7 +468,7 @@ func init() {
 			favorLevel += poles[index].Favor
 			induceLevel += poles[index].Induce
 		}
-		if rand.Intn(100) >= 90 {
+		if rand.Intn(100) > MERGE_FISHING_ROD {
 			ctx.Send(
 				message.ReplyWithMessage(ctx.Event.MessageID,
 					message.Text("合成失败,材料已销毁"),

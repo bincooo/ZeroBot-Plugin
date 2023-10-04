@@ -6,6 +6,7 @@ import (
 	"errors"
 	"image"
 	"image/color"
+	"math/rand"
 	"strconv"
 	"strings"
 	"sync"
@@ -40,10 +41,13 @@ func init() {
 			ctx.SendChain(message.Text("[ERROR at pack.go.3]:", err))
 			return
 		}
-		ctx.SendChain(message.ImageBytes(pic))
+		ctx.SendChain(message.At(uid), message.ImageBytes(pic))
 	})
-	engine.OnRegex(`^消除绑定诅咒(\d*)$`, getdb).SetBlock(true).Limit(ctxext.LimitByUser).Handle(func(ctx *zero.Ctx) {
+	engine.OnRegex(`^消除绑定诅咒(\d*)$`, getdb).SetBlock(true).Limit(CustomLimitByUser).Handle(func(ctx *zero.Ctx) {
 		uid := ctx.Event.UserID
+		sMu.SLock(uid)
+		defer sMu.SUnlock(uid)
+
 		number, _ := strconv.Atoi(ctx.State["regex_matched"].([]string)[1])
 		if number == 0 {
 			number = 1
@@ -83,6 +87,10 @@ func init() {
 		articles, err = dbdata.getUserThingInfo(uid, "宝藏诅咒")
 		if err != nil {
 			ctx.SendChain(message.Text("消除失败,净化书销毁了\n[ERROR at store.go.3.5]:", err))
+			return
+		}
+		if rand.Intn(100) > CLEAR_DEBUFF {
+			ctx.SendChain(message.Text("消除失败了,净化书已销毁"))
 			return
 		}
 		articles[0].Number -= number

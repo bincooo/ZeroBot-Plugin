@@ -4,6 +4,7 @@ package mcfish
 import (
 	"image"
 	"image/color"
+	"math/rand"
 	"strconv"
 	"strings"
 	"time"
@@ -14,19 +15,24 @@ import (
 	"github.com/FloatTech/gg"
 	"github.com/FloatTech/imgfactory"
 	"github.com/FloatTech/zbputils/control"
+	"github.com/FloatTech/zbputils/ctxext"
 	"github.com/FloatTech/zbputils/img/text"
 	"github.com/sirupsen/logrus"
 	zero "github.com/wdvxdr1123/ZeroBot"
-	"github.com/wdvxdr1123/ZeroBot/extension/rate"
 	"github.com/wdvxdr1123/ZeroBot/message"
 )
 
 var (
-	storeLimiter = rate.NewManager[int64](time.Second*3, 1)
-	refresh      = false
-	timeNow      = 0
-	refreshFish  = func(ctx *zero.Ctx) bool {
-		if refresh && timeNow == time.Now().Day() {
+	refresh     = false
+	timeNow     time.Time
+	refreshFish = func(ctx *zero.Ctx) bool {
+		curr := time.Now()
+		if refresh && timeNow.Day() == curr.Day() {
+			hour := timeNow.Hour()
+			if hour < 12 && curr.Hour() > 11 {
+				_, _ = dbdata.refreshStroeInfo()
+				timeNow = curr.Add(3 * time.Hour)
+			}
 			return true
 		}
 		refresh, err := dbdata.refreshStroeInfo()
@@ -34,17 +40,44 @@ var (
 			ctx.SendChain(message.Text("[ERROR at store.go.1]:", err))
 			return refresh
 		}
-		timeNow = time.Now().Day()
+		timeNow = time.Now()
+		// 随机上架几个基础渔具
+		if rand.Intn(100) < BASE_FG {
+			infos, err := dbdata.getStoreThingInfo("木竿")
+			if err != nil {
+				ctx.SendChain(message.Text("[ERROR at store.go.9]:", err))
+				goto label
+			}
+			// 检查是否已有特价木竿，并把数量恢复到初始
+			for _, thing := range infos {
+				if thing.Other == TJ {
+					if thing.Number < 10 {
+						thing.Number = rand.Intn(15) + 10
+						_ = dbdata.updateStoreInfo(thing)
+					}
+					goto label
+				}
+			}
+			newCommodity := store{
+				Duration: time.Now().Unix(),
+				Type:     "pole",
+				Name:     "木竿",
+				Number:   rand.Intn(15) + 10, // 数量10~25
+				Price:    100,
+				Other:    TJ,
+			}
+			err = dbdata.updateStoreInfo(newCommodity)
+			if err != nil {
+				ctx.SendChain(message.Text("[ERROR at store.go.9]:", err))
+			}
+		}
+	label:
 		return refresh
 	}
 )
 
-func limitSet(ctx *zero.Ctx) *rate.Limiter {
-	return storeLimiter.Load(ctx.Event.UserID)
-}
-
 func init() {
-	engine.OnFullMatchGroup([]string{"钓鱼看板", "钓鱼商店"}, getdb, refreshFish).SetBlock(true).Limit(limitSet).Handle(func(ctx *zero.Ctx) {
+	engine.OnFullMatchGroup([]string{"钓鱼看板", "钓鱼商店"}, getdb, refreshFish).SetBlock(true).Limit(ctxext.LimitByUser).Handle(func(ctx *zero.Ctx) {
 		infos, err := dbdata.getStoreInfo()
 		if err != nil {
 			ctx.SendChain(message.Text("[ERROR at store.go.2]:", err))
@@ -67,20 +100,12 @@ func init() {
 		}
 		ctx.SendChain(message.ImageBytes(pic))
 	})
-	engine.OnRegex(`^出售(`+strings.Join(thingList, "|")+`)\s*(\d*)$`, getdb, refreshFish).SetBlock(true).Limit(limitSet).Handle(func(ctx *zero.Ctx) {
+	engine.OnRegex(`^出售(`+strings.Join(thingList, "|")+`)\s*(\d*)$`, getdb, refreshFish).SetBlock(true).Limit(CustomLimitByUser).Handle(func(ctx *zero.Ctx) {
 		uid := ctx.Event.UserID
+		sMu.SLock(uid)
+		defer sMu.SUnlock(uid)
+
 		thingName := ctx.State["regex_matched"].([]string)[1]
-		if strings.Contains(thingName, "竿") {
-			times, err := dbdata.checkCanSalesFor(uid, true)
-			if err != nil {
-				ctx.SendChain(message.Text("[ERROR at store.go.75]:", err))
-				return
-			}
-			if times <= 0 {
-				ctx.SendChain(message.Text("出售次数已达到上限,明天再来售卖吧"))
-				return
-			}
-		}
 		number, _ := strconv.Atoi(ctx.State["regex_matched"].([]string)[2])
 		if number == 0 || strings.Contains(thingName, "竿") {
 			number = 1
@@ -107,7 +132,7 @@ func init() {
 						"[", i, "]", info.Name, "  数量: ", info.Number, "\n"))
 				}
 			}
-			msg = append(msg, message.Text("————————\n输入对应序号进行装备,或回复“取消”取消"))
+			msg = append(msg, message.Text("————————\n输入对应序号进行出售,或回复“取消”取消"))
 			ctx.Send(msg)
 			// 等待用户下一步选择
 			sell := false
@@ -115,7 +140,7 @@ func init() {
 			defer cancel()
 			for {
 				select {
-				case <-time.After(time.Second * 120):
+				case <-time.After(time.Second * 60):
 					ctx.Send(
 						message.ReplyWithMessage(ctx.Event.MessageID,
 							message.Text("等待超时,取消出售"),
@@ -147,17 +172,23 @@ func init() {
 
 		thing = articles[index]
 		if thing.Number < number {
-			number = thing.Number
+			ctx.Send(message.ReplyWithMessage(ctx.Event.MessageID, message.Text("背包数量不足")))
+			return
 		}
 
 		var pice int
+		// 卖出的渔具存在附魔等级
+		var hasBuff = false
 		if strings.Contains(thingName, "竿") || thingName == "三叉戟" {
 			poleInfo := strings.Split(articles[index].Other, "/")
 			durable, _ := strconv.Atoi(poleInfo[0])
 			maintenance, _ := strconv.Atoi(poleInfo[1])
 			induceLevel, _ := strconv.Atoi(poleInfo[2])
 			favorLevel, _ := strconv.Atoi(poleInfo[3])
-			pice = (priceList[thingName] - (durationList[thingName] - durable) - maintenance*2 + induceLevel*600 + favorLevel*1800) * discountList[thingName] / 100
+			if induceLevel > 0 || favorLevel > 0 { // 存在附魔等级
+				hasBuff = true
+			}
+			pice = (priceList[thingName] - (durationList[thingName] - durable) - maintenance*2 + induceLevel*SELL_BUFF_1_PRICE + favorLevel*SELL_BUFF_2_PRICE) * discountList[thingName] / 100
 		} else {
 			pice = priceList[thingName] * discountList[thingName] / 100
 		}
@@ -169,7 +200,7 @@ func init() {
 		for {
 			select {
 			case <-time.After(time.Second * 60):
-				ctx.Send(message.ReplyWithMessage(ctx.Event.MessageID, message.Text("等待超时,取消钓鱼")))
+				ctx.Send(message.ReplyWithMessage(ctx.Event.MessageID, message.Text("等待超时,取消出售")))
 				return
 			case e := <-recv:
 				nextcmd := e.Event.Message.String()
@@ -193,7 +224,7 @@ func init() {
 			recordInfo := records[0]
 			numberOfRecord := recordInfo.Number
 			if thingName == "唱片" {
-				numberOfRecord -= number
+				numberOfRecord--
 			}
 			if numberOfRecord > 0 {
 				ctx.Send(message.ReplyWithMessage(ctx.Event.MessageID, message.Text("是否使用唱片让价格翻倍?\n回答\"是\"或\"否\"")))
@@ -219,9 +250,6 @@ func init() {
 				}
 				if use {
 					pice *= 2
-					if thingName == "唱片" {
-						thing.Number--
-					}
 					recordInfo.Number--
 					err = dbdata.updateUserThingInfo(uid, recordInfo)
 					if err != nil {
@@ -247,16 +275,23 @@ func init() {
 			ctx.SendChain(message.Text("[ERROR at store.go.6]:", err))
 			return
 		}
+		// 判断是否有上架的价值
 		newCommodity := store{}
 		if strings.Contains(thing.Name, "竿") || thing.Name == "三叉戟" {
-			if pice >= priceList[thing.Name]*2 { // 无附魔的不要
+			if hasBuff { // 无附魔的不要
+				//if pice >= priceList[thing.Name]*2 { // 无附魔的不要
+				poleInfo := strings.Split(thing.Other, "/")
+				durable, _ := strconv.Atoi(poleInfo[0])
+				if durable < 12 {
+					poleInfo[0] = "12"
+				}
 				newCommodity = store{
 					Duration: time.Now().Unix(),
 					Type:     "pole",
 					Name:     thing.Name,
 					Number:   1,
 					Price:    pice,
-					Other:    thing.Other,
+					Other:    strings.Join(poleInfo, "/"),
 				}
 				polelist, _ := dbdata.getStoreThingInfo(thing.Name)
 				if len(polelist) > 5 { // 超出上限的不要
@@ -292,22 +327,24 @@ func init() {
 				return
 			}
 		}
-		pice = pice * 8 / 10
+		pice = pice * 8 / 10 // 扣除20%的税收
 		err = wallet.InsertWalletOf(uid, pice*number)
 		if err != nil {
 			ctx.SendChain(message.Text("[ERROR at store.go.10]:", err))
 			return
 		}
-		if strings.Contains(thingName, "竿") {
-			err = dbdata.updateCurseFor(uid, "sell", 1)
-			if err != nil {
-				logrus.Warnln(err)
-			}
+
+		err = dbdata.updateCurseFor(uid, "sell", 1)
+		if err != nil {
+			logrus.Warnln(err)
 		}
 		ctx.Send(message.ReplyWithMessage(ctx.Event.MessageID, message.Text("出售成功,你赚到了", pice*number, msg)))
 	})
-	engine.OnRegex(`^购买(`+strings.Join(thingList, "|")+`)\s*(\d*)$`, getdb, refreshFish).SetBlock(true).Limit(limitSet).Handle(func(ctx *zero.Ctx) {
+	engine.OnRegex(`^购买(`+strings.Join(thingList, "|")+`)\s*(\d*)$`, getdb, refreshFish).SetBlock(true).Limit(CustomLimitByUser).Handle(func(ctx *zero.Ctx) {
 		uid := ctx.Event.UserID
+		sMu.SLock(uid)
+		defer sMu.SUnlock(uid)
+
 		numberOfPole, err := dbdata.getNumberFor(uid, "竿")
 		if err != nil {
 			ctx.SendChain(message.Text("[ERROR at store.go.9.3]:", err))
@@ -315,15 +352,6 @@ func init() {
 		}
 		if numberOfPole > 50 {
 			ctx.SendChain(message.Text("你有", numberOfPole, "支鱼竿,大于50支的玩家不允许购买东西"))
-			return
-		}
-		buytimes, err := dbdata.checkCanSalesFor(uid, false)
-		if err != nil {
-			ctx.SendChain(message.Text("[ERROR at store.go.75]:", err))
-			return
-		}
-		if buytimes <= 0 {
-			ctx.SendChain(message.Text("出售次数已达到上限,明天再来购买吧"))
 			return
 		}
 		thingName := ctx.State["regex_matched"].([]string)[1]
@@ -372,7 +400,7 @@ func init() {
 				maintenance, _ := strconv.Atoi(poleInfo[1])
 				induceLevel, _ := strconv.Atoi(poleInfo[2])
 				favorLevel, _ := strconv.Atoi(poleInfo[3])
-				thingPice := (priceList[info.Name] - (durationList[info.Name] - durable) - maintenance*2 + induceLevel*600 + favorLevel*1800) * discountList[info.Name] / 100
+				thingPice := (priceList[info.Name] - (durationList[info.Name] - durable) - maintenance*2 + induceLevel*BUY_BUFF_1_PRICE + favorLevel*BUY_BUFF_2_PRICE) * discountList[info.Name] / 100
 				pice = append(pice, thingPice)
 			} else {
 				thingPice := priceList[info.Name] * discountList[info.Name] / 100
@@ -421,6 +449,23 @@ func init() {
 						ctx.SendChain(message.At(ctx.Event.UserID), message.Text("请输入正确的序号"))
 						continue
 					}
+					thing := thingInfos[index]
+					// 特价品限购
+					if thing.Name == "木竿" && thing.Other == TJ {
+						curse, err := dbdata.getNumberFor(uid, thing.Name)
+						if err != nil {
+							ctx.SendChain(message.Text("[ERROR at store.go.9.3]:", err))
+							return
+						}
+						if curse > 0 {
+							ctx.SendChain(message.At(ctx.Event.UserID), message.Text("你已有木竿，请把机会让给有需要的人"))
+							continue
+						}
+						if number > 1 {
+							ctx.SendChain(message.At(ctx.Event.UserID), message.Text("特价商品每人限购一把哦~"))
+							continue
+						}
+					}
 					sell = true
 				}
 				if sell {
@@ -434,30 +479,23 @@ func init() {
 			ctx.Send(message.ReplyWithMessage(ctx.Event.MessageID, message.Text("商店数量不足")))
 			return
 		}
+
+		// 每次限购，防止垄断。可让玩家拼手速
+		if number > RPC {
+			ctx.Send(message.ReplyWithMessage(ctx.Event.MessageID, message.Text("每次限购最多"+strconv.Itoa(RPC)+"件")))
+			return
+		}
+
 		price := pice[index] * number
 
-		msg := ""
-		times := math.Min(3, number)
-		coupon, err := dbdata.useCouponAt(uid, times)
-		if err != nil {
-			logrus.Warnln(err)
-		}
-		if coupon != -1 {
-			msg += "\n(半价福利还有" + strconv.Itoa(3-coupon) + "次)"
-			price = pice[index]*(number-coupon) + (pice[index]/2)*coupon
-		} else {
-			err = dbdata.updateBuyTimeFor(uid, 1)
-			if err != nil {
-				logrus.Warnln(err)
-			}
-		}
 		curse, err := dbdata.getNumberFor(uid, "宝藏诅咒")
 		if err != nil {
 			ctx.SendChain(message.Text("[ERROR at store.go.9.3]:", err))
 			return
 		}
+		msg := ""
 		if curse != 0 {
-			msg += "\n(你身上绑定了" + strconv.Itoa(curse) + "层诅咒)"
+			msg = "\n(你身上绑定了" + strconv.Itoa(curse) + "层诅咒)"
 			price = price * (100 + 10*curse) / 100
 		}
 
@@ -540,13 +578,11 @@ func init() {
 			ctx.SendChain(message.Text("[ERROR at store.go.14]:", err))
 			return
 		}
-		if strings.Contains(thingName, "竿") {
-			err = dbdata.updateCurseFor(uid, "buy", 1)
-			if err != nil {
-				logrus.Warnln(err)
-			}
+		err = dbdata.updateCurseFor(uid, "buy", 1)
+		if err != nil {
+			logrus.Warnln(err)
 		}
-		ctx.Send(message.ReplyWithMessage(ctx.Event.MessageID, message.Text("你用", price, "购买了", number, thingName)))
+		ctx.Send(message.ReplyWithMessage(ctx.Event.MessageID, message.Text("购买成功")))
 	})
 }
 
@@ -689,7 +725,7 @@ func drawStroeInfoImage(stroeInfo []store) (picImage image.Image, err error) {
 			maintenance, _ := strconv.Atoi(poleInfo[1])
 			induceLevel, _ := strconv.Atoi(poleInfo[2])
 			favorLevel, _ := strconv.Atoi(poleInfo[3])
-			pice = (priceList[info.Name] - (durationList[info.Name] - durable) - maintenance*2 + induceLevel*600 + favorLevel*1800) * discountList[info.Name] / 100
+			pice = (priceList[info.Name] - (durationList[info.Name] - durable) - maintenance*2 + induceLevel*BUY_BUFF_1_PRICE + favorLevel*BUY_BUFF_2_PRICE) * discountList[info.Name] / 100
 		} else {
 			pice = priceList[info.Name] * discountList[info.Name] / 100
 		}

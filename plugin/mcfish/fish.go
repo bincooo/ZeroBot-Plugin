@@ -8,15 +8,17 @@ import (
 	"time"
 
 	"github.com/FloatTech/AnimeAPI/wallet"
-	"github.com/FloatTech/zbputils/ctxext"
 	"github.com/sirupsen/logrus"
 	zero "github.com/wdvxdr1123/ZeroBot"
 	"github.com/wdvxdr1123/ZeroBot/message"
 )
 
 func init() {
-	engine.OnRegex(`^进行(([1-5]\d|[1-9])次)?钓鱼$`, getdb).SetBlock(true).Limit(ctxext.LimitByUser).Handle(func(ctx *zero.Ctx) {
+	engine.OnRegex(`^进行(([1-5]\d|[1-9])次)?钓鱼$`, getdb).SetBlock(true).Limit(CustomLimitByUser).Handle(func(ctx *zero.Ctx) {
 		uid := ctx.Event.UserID
+		sMu.SLock(uid)
+		defer sMu.SUnlock(uid)
+
 		numberOfPole, err := dbdata.getNumberFor(uid, "竿")
 		if err != nil {
 			ctx.SendChain(message.Text("[ERROR at store.go.9.3]:", err))
@@ -48,10 +50,10 @@ func init() {
 				return
 			}
 			if !ok {
-				ctx.SendChain(message.At(uid), message.Text("请装备鱼竿后钓鱼", err))
+				ctx.SendChain(message.At(uid), message.Text("请装备鱼竿后钓鱼（3/3次购买初始木竿）"))
 				return
 			}
-			ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text("你尚未装备鱼竿,是否花费100购买鱼竿?\n回答\"是\"或\"否\""))
+			ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text("你尚未装备鱼竿,是否花费100购买鱼竿?\n回答\"是\"或\"否\"（?/3次购买初始木竿）"))
 			// 等待用户下一步选择
 			recv, cancel := zero.NewFutureEvent("message", 999, false, zero.RegexRule(`^(是|否)$`), zero.CheckUser(ctx.Event.UserID)).Repeat()
 			defer cancel()
@@ -129,7 +131,21 @@ func init() {
 				fishNumber *= 3
 			}
 		} else {
-			fishNmaes, err := dbdata.pickFishFor(uid, fishNumber)
+			// 减少吃掉的数量
+			_fishNumber := fishNumber / 2
+			if _fishNumber == 0 {
+				_fishNumber = 1
+			}
+			if fishNumber > 40 {
+				_fishNumber += 5
+			} else if fishNumber > 30 {
+				_fishNumber += 3
+			} else if fishNumber > 20 {
+				_fishNumber += 2
+			} else if fishNumber > 10 {
+				_fishNumber += 1
+			}
+			fishNmaes, err := dbdata.pickFishFor(uid, _fishNumber)
 			if err != nil {
 				ctx.SendChain(message.Text("[ERROR at fish.go.5.1]:", err))
 				return
@@ -144,13 +160,13 @@ func init() {
 				return
 			}
 			msg = "(美西螈吃掉了"
-			fishNumber = 0
+			//fishNumber = 0
 			for name, number := range fishNmaes {
-				fishNumber += number
+				//fishNumber += number
 				msg += strconv.Itoa(number) + name + "、"
 			}
 			msg += ")"
-			fishNumber /= 2
+			//fishNumber /= 2
 		}
 		waitTime := 120 / (equipInfo.Induce + 1)
 		ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text("你开始去钓鱼了,请耐心等待鱼上钩(预计要", time.Second*time.Duration(waitTime), ")"))
