@@ -31,7 +31,11 @@ var (
 			hour := timeNow.Hour()
 			if hour < 12 && curr.Hour() > 11 {
 				_, _ = dbdata.refreshStroeInfo()
-				timeNow = curr.Add(3 * time.Hour)
+				if curr.Hour() > 12 {
+					timeNow = curr
+				} else {
+					timeNow = curr.Add(3 * time.Hour)
+				}
 			}
 			return true
 		}
@@ -391,6 +395,20 @@ func init() {
 				number = curse
 			}
 		}
+
+		if strings.Contains(thingName, "鱼") || strings.Contains(thingName, "螺") || strings.Contains(thingName, "豚") {
+			num, err := dbdata.getNumberFor(uid, thingName)
+			if err != nil {
+				ctx.SendChain(message.Text("[ERROR at store.go]:", err))
+				return
+			}
+			// 背包超额，限制购买
+			if num+number > 100 {
+				ctx.SendChain(message.Text("背包内最多限购100，你目前仅限购买" + strconv.Itoa(100-num)))
+				return
+			}
+		}
+
 		index := 0
 		pice := make([]int, 0, len(thingInfos))
 		for _, info := range thingInfos {
@@ -582,6 +600,7 @@ func init() {
 		if err != nil {
 			logrus.Warnln(err)
 		}
+		logrus.Info("购买信息：", newCommodity)
 		ctx.Send(message.ReplyWithMessage(ctx.Event.MessageID, message.Text("购买成功")))
 	})
 }

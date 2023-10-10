@@ -235,7 +235,11 @@ func (sql *fishdb) updateFishInfo(uid int64, number int) (residue int, err error
 		userInfo.Duration = time.Now().Unix()
 	} else if timeNow.Hour() < 12 && curr.Hour() > 11 {
 		userInfo.Fish = 0
-		userInfo.Duration = curr.Add(3 * time.Hour).Unix()
+		if curr.Hour() > 12 {
+			userInfo.Duration = curr.Unix()
+		} else {
+			userInfo.Duration = curr.Add(3 * time.Hour).Unix()
+		}
 	}
 	if userInfo.Fish >= FishLimit {
 		return 0, nil
@@ -396,17 +400,18 @@ func (sql *fishdb) pickFishFor(uid int64, number int) (fishNames map[string]int,
 	}
 	fishInfo := article{}
 	k := 0
-	for i := number * 2; i > 0 && k < len(fishList); {
+	for i := number; i > 0 && k < len(fishList); {
 		_ = sql.db.Find(name, &fishInfo, "where Name is '"+fishList[k]+"'")
 		if fishInfo.Number <= 0 {
 			k++
 			continue
 		}
 		if fishInfo.Number < i {
-			k++
-			fishInfo.Number = 0
-			i -= fishInfo.Number
 			fishNames[fishInfo.Name] += fishInfo.Number
+			i -= fishInfo.Number
+			fishInfo.Number = 0
+			k++
+
 		} else {
 			fishNames[fishInfo.Name] += i
 			fishInfo.Number -= i

@@ -132,18 +132,13 @@ func init() {
 			}
 		} else {
 			// 减少吃掉的数量
-			_fishNumber := fishNumber / 2
-			if _fishNumber == 0 {
-				_fishNumber = 1
-			}
-			if fishNumber > 40 {
+			_fishNumber := fishNumber - (fishNumber / 3)
+			if fishNumber > 30 {
 				_fishNumber += 5
-			} else if fishNumber > 30 {
-				_fishNumber += 3
 			} else if fishNumber > 20 {
-				_fishNumber += 2
+				_fishNumber += 3
 			} else if fishNumber > 10 {
-				_fishNumber += 1
+				_fishNumber += 2
 			}
 			fishNmaes, err := dbdata.pickFishFor(uid, _fishNumber)
 			if err != nil {
