@@ -132,7 +132,7 @@ func init() {
 			}
 		} else {
 			// 减少吃掉的数量
-			_fishNumber := fishNumber - (fishNumber / 3)
+			_fishNumber := fishNumber - (fishNumber / 2)
 			if fishNumber > 30 {
 				_fishNumber += 5
 			} else if fishNumber > 20 {

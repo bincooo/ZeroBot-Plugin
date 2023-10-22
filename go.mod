@@ -17,7 +17,7 @@ require (
 	github.com/RomiChan/syncx v0.0.0-20221202055724-5f842c53020e
 	github.com/RomiChan/websocket v1.4.3-0.20220227141055-9b2c6168c9c5
 	github.com/antchfx/htmlquery v1.2.5
-	github.com/bincooo/llm-plugin v1.0.1-0.20231012045822-d1097ae08d50
+	github.com/bincooo/llm-plugin v1.0.1-0.20231022091725-f72a3193d8ea
 	github.com/corona10/goimagehash v1.1.0
 	github.com/davidscholberg/go-durationfmt v0.0.0-20170122144659-64843a2083d3
 	github.com/disintegration/imaging v1.6.2
@@ -45,7 +45,7 @@ require (
 	gitlab.com/gomidi/midi/v2 v2.0.25
 	golang.org/x/image v0.3.0
 	golang.org/x/sys v0.8.0
-	golang.org/x/text v0.9.0
+	golang.org/x/text v0.13.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -55,10 +55,10 @@ require (
 	github.com/aliyun/aliyun-oss-go-sdk v2.2.7+incompatible // indirect
 	github.com/andybalholm/brotli v1.0.5 // indirect
 	github.com/antchfx/xpath v1.2.1 // indirect
-	github.com/bincooo/AutoAI v1.0.12-pre2.0.20231012044000-f494bd84f4aa // indirect
-	github.com/bincooo/claude-api v1.0.3-0.20231006025050-b13fff6295cc // indirect
-	github.com/bincooo/edge-api v1.0.1-0.20231012031127-8dac37c618bc // indirect
-	github.com/bincooo/openai-wapi v1.0.1-0.20230717215411-79a74f385b4f // indirect
+	github.com/bincooo/chatgpt-adapter v1.0.13-0.20231022085914-01bed3c1b991 // indirect
+	github.com/bincooo/claude-api v1.0.3 // indirect
+	github.com/bincooo/edge-api v1.0.1 // indirect
+	github.com/bincooo/openai-wapi v1.0.1 // indirect
 	github.com/bincooo/requests v0.0.0-20230720064210-7eae5d6c9d1e // indirect
 	github.com/bitly/go-simplejson v0.5.0 // indirect
 	github.com/bogdanfinn/fhttp v0.5.19 // indirect
@@ -116,7 +116,7 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20220927061507-ef77025ab5aa // indirect
 	github.com/samber/go-gpt-3-encoder v0.3.1 // indirect
 	github.com/samber/lo v1.37.0 // indirect
-	github.com/sashabaranov/go-openai v1.15.3 // indirect
+	github.com/sashabaranov/go-openai v1.16.0 // indirect
 	github.com/tam7t/hpkp v0.0.0-20160821193359-2b70b4024ed5 // indirect
 	github.com/tetratelabs/wazero v1.5.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
