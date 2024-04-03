@@ -138,7 +138,7 @@ var (
 		dbdata.db.DBPath = engine.DataFolder() + "fishdata.db"
 		err := dbdata.db.Open(time.Hour * 24)
 		if err != nil {
-			ctx.SendChain(message.Text("[ERROR at main.go.1]:", err))
+			ctx.SendChain(message.Text("[ERROR at vars.go.1]:", err))
 			return false
 		}
 		return true

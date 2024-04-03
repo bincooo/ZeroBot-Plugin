@@ -1,0 +1,19 @@
+{
+  "zero": {
+    "nickname": [
+      "喵小爱"
+    ],
+    "command_prefix": "/",
+    "super_users": [1263212092],
+    "ring_len": 4096,
+    "latency": 233000000,
+    "max_process_time": 240000000000
+  },
+  "ws": [
+    {
+      "Url": "ws://127.0.0.1:8080",
+      "AccessToken": ""
+    }
+  ],
+  "wss": null
+}
