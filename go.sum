@@ -34,8 +34,8 @@ github.com/antchfx/htmlquery v1.2.5 h1:1lXnx46/1wtv1E/kzmH8vrfMuUKYgkdDBA9pIdMJn
 github.com/antchfx/htmlquery v1.2.5/go.mod h1:2MCVBzYVafPBmKbrmwB9F5xdd+IEgRY61ci2oOsOQVw=
 github.com/antchfx/xpath v1.2.1 h1:qhp4EW6aCOVr5XIkT+l6LJ9ck/JsUH/yyauNgTQkBF8=
 github.com/antchfx/xpath v1.2.1/go.mod h1:i54GszH55fYfBmoZXapTHN8T8tkcHfRgLyVwwqzXNcs=
-github.com/bincooo/gpt v0.0.0-20240330124633-652d98fefe8c h1:9pBrmjkorQIpQdhTuEGlhuvg2SuxwhblvikhYrkgEGI=
-github.com/bincooo/gpt v0.0.0-20240330124633-652d98fefe8c/go.mod h1:jlDUdjGc2kHL+hvOu+luC2cEikxIYm/mZastOKtOzu4=
+github.com/bincooo/gpt v0.0.0-20240503174314-5fd3ab7634ce h1:oQYy8wrZRwGhqUudlsKQn8C1+E6XVWe0yOLqGbfeliM=
+github.com/bincooo/gpt v0.0.0-20240503174314-5fd3ab7634ce/go.mod h1:jlDUdjGc2kHL+hvOu+luC2cEikxIYm/mZastOKtOzu4=
 github.com/chzyer/logex v1.1.10/go.mod h1:+Ywpsq7O8HXn0nuIou7OrIPyXbp3wmkHB+jjWRnGsAI=
 github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e/go.mod h1:nSuG5e5PlCu98SY8svDHJxuZscDgtXS6KTTbou5AhLI=
 github.com/chzyer/test v0.0.0-20180213035817-a1ea475d72b1/go.mod h1:Q3SI9o4m/ZMnBNeIyt5eFwwo7qiLfzFZmjNmxjkiQlU=

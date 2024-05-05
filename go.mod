@@ -17,7 +17,7 @@ require (
 	github.com/RomiChan/syncx v0.0.0-20221202055724-5f842c53020e
 	github.com/RomiChan/websocket v1.4.3-0.20220227141055-9b2c6168c9c5
 	github.com/antchfx/htmlquery v1.2.5
-	github.com/bincooo/gpt v0.0.0-20240330124633-652d98fefe8c
+	github.com/bincooo/gpt v0.0.0-20240503174314-5fd3ab7634ce
 	github.com/corona10/goimagehash v1.1.0
 	github.com/davidscholberg/go-durationfmt v0.0.0-20170122144659-64843a2083d3
 	github.com/disintegration/imaging v1.6.2
